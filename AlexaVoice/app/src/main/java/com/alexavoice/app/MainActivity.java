@@ -1,6 +1,10 @@
 package com.alexavoice.app;
 
 import android.Manifest;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.os.SystemClock;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -10,9 +14,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.speech.tts.TextToSpeech;
-import android.speech.tts.Voice;
-import android.util.TypedValue;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -22,139 +23,75 @@ import android.widget.ScrollView;
 import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
-import java.util.Locale;
 
-public class MainActivity extends Activity {
-    private TextView pendingView;
-    private TextView stateView;
-    private TextToSpeech tts;
-    private boolean ttsReady;
-
-    @Override public void onCreate(Bundle saved) {
-        super.onCreate(saved);
-        FrameLayout canvas = new FrameLayout(this);
-        canvas.setBackgroundColor(Color.BLACK);
-        ImageView background = new ImageView(this);
-        background.setImageResource(R.drawable.anime_background);
-        background.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        canvas.addView(background, new FrameLayout.LayoutParams(-1, -1));
-        View overlay = new View(this);
-        overlay.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xC5000000, 0x40000000, 0xED000000}));
-        canvas.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
-        ScrollView scroller = new ScrollView(this);
-        LinearLayout root = new LinearLayout(this);
-        root.setPadding(dp(22), dp(32), dp(22), dp(32));
-        root.setOrientation(LinearLayout.VERTICAL);
-        scroller.addView(root);
-        canvas.addView(scroller, new FrameLayout.LayoutParams(-1, -1));
-        setContentView(canvas);
-
-        root.addView(text("AVENTURA · RECORDATORIOS", 12, 0xFFFFD28A, true));
-        root.addView(text("Alexa Voice", 34, Color.WHITE, true));
-        root.addView(text("Recordatorios hablados, sin micrófono.", 15, 0xFFE8DCD0, false));
-        root.addView(new Space(this), new LinearLayout.LayoutParams(1, dp(110)));
-
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(19), dp(18), dp(19), dp(18));
-        card.setBackground(panel(0xE8231D22, 24));
-        root.addView(card, fullWidth());
-        card.addView(text("RECORDATORIO PENDIENTE", 12, 0xFFFFD28A, true));
-        pendingView = text("Sin recordatorios pendientes", 21, Color.WHITE, true);
-        pendingView.setPadding(0, dp(8), 0, dp(6));
-        card.addView(pendingView);
-        stateView = text("Listo para recibir recordatorios", 14, 0xFFE8DCD0, false);
-        card.addView(stateView);
-        card.addView(text("Se repite cada 2 minutos hasta confirmar.", 13, 0xFFFFD28A, false));
-
-        Button done = button("✓  YA LO HICE", 0xFFFFB749, 0xFF21160F);
-        done.setOnClickListener(v -> {
-            AlexaNotificationListener.confirm(this);
-            updatePending();
-            stateView.setText("Confirmado. Repeticiones detenidas.");
-        });
-        root.addView(done, fullWidth());
-        Button test = button("▶  PROBAR VOZ", 0xCC252532, Color.WHITE);
-        test.setOnClickListener(v -> {
-            if (ttsReady) tts.speak("Hola. Soy Alexa Voice. Leeré tus recordatorios de Alexa.",
-                    TextToSpeech.QUEUE_FLUSH, null, "test");
-            else Toast.makeText(this, "La voz aún no está disponible", Toast.LENGTH_SHORT).show();
-        });
-        root.addView(test, fullWidth());
-        Button access = button("⚙  ACTIVAR ACCESO A NOTIFICACIONES", 0xCC252532, Color.WHITE);
-        access.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
-        root.addView(access, fullWidth());
-        root.addView(text("Solo se procesan notificaciones de la aplicación Amazon Alexa. " +
-                "Android concede acceso amplio a las notificaciones al habilitar este servicio. " +
-                "El micrófono está desactivado: esta versión no solicita permiso de audio.",
-                13, 0xFFE8DCD0, false));
-
-        if (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 501);
-        }
-        tts = new TextToSpeech(this, status -> {
-            if (status == TextToSpeech.SUCCESS && tts != null) {
-                int result = tts.setLanguage(new Locale("es", "ES"));
-                ttsReady = result != TextToSpeech.LANG_MISSING_DATA &&
-                        result != TextToSpeech.LANG_NOT_SUPPORTED;
-                selectSpanishVoice();
-            }
-        });
-        updatePending();
+public final class MainActivity extends Activity {
+    private TextView currentView;
+    private TextView countView;
+    private int dp(int px){return (int)(getResources().getDisplayMetrics().density*px+.5f);}
+    private GradientDrawable bg(int color){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(18));return d;}
+    private TextView label(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextColor(color);t.setTextSize(size);return t;}
+    private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setTextSize(15);b.setBackground(bg(color));b.setMinHeight(dp(56));return b;}
+    @Override public void onCreate(Bundle state){
+        super.onCreate(state);
+        FrameLayout frame=new FrameLayout(this);frame.setBackgroundColor(Color.BLACK);
+        ImageView wallpaper=new ImageView(this);wallpaper.setImageResource(R.drawable.anime_background);
+        wallpaper.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        frame.addView(wallpaper,new FrameLayout.LayoutParams(-1,-1));
+        View overlay=new View(this);
+        overlay.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xAE000000,0x44000000,0xEF080B15}));
+        frame.addView(overlay,new FrameLayout.LayoutParams(-1,-1));
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(22),dp(32),dp(22),dp(24)); scroll.addView(root);
+        frame.addView(scroll,new FrameLayout.LayoutParams(-1,-1));setContentView(frame);
+        TextView caption=label("AVENTURA • RECORDATORIOS",12,0xFFFFC979); root.addView(caption);
+        TextView title=label("Alexa Voice",34,Color.WHITE);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);root.addView(title);
+        root.addView(label("Recordatorios hablados, incluso con pantalla bloqueada*",14,Color.WHITE));
+        root.addView(new Space(this),new LinearLayout.LayoutParams(1,dp(120)));
+        LinearLayout card=new LinearLayout(this);card.setPadding(dp(18),dp(18),dp(18),dp(18));card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(bg(0xE3212630));root.addView(card,new LinearLayout.LayoutParams(-1,-2));
+        countView=label("RECORDATORIOS",13,0xFFFFCF85);card.addView(countView);
+        currentView=label("Sin recordatorios pendientes",22,Color.WHITE);currentView.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        card.addView(currentView);
+        card.addView(label("Reintentos cada 2 minutos mientras Android lo permita.",13,0xFFF2D7AA));
+        Button done=button("✓  YA LO HICE",0xFFB5751E);root.addView(done,new LinearLayout.LayoutParams(-1,dp(62)));
+        done.setOnClickListener(v->{if(ReminderEngine.count(this)>0){ReminderEngine.confirmCurrent(this);refresh();Toast.makeText(this,"Recordatorio confirmado",Toast.LENGTH_SHORT).show();}});
+        Button settings=button("⚙  ACCESO A NOTIFICACIONES",0xFF294966);
+        LinearLayout.LayoutParams margins=new LinearLayout.LayoutParams(-1,dp(62));margins.topMargin=dp(12);root.addView(settings,margins);
+        settings.setOnClickListener(v->startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        Button test=button("🔊  PROBAR CON PANTALLA APAGADA",0xFF21665E);
+        LinearLayout.LayoutParams testMargins=new LinearLayout.LayoutParams(-1,dp(62));
+        testMargins.topMargin=dp(12);root.addView(test,testMargins);
+        test.setOnClickListener(v->scheduleScreenOffTest());
+        Button preview=button("↻  ACTUALIZAR ESTADO",0xFF343D4E);
+        LinearLayout.LayoutParams margins2=new LinearLayout.LayoutParams(-1,dp(62));margins2.topMargin=dp(12);root.addView(preview,margins2);
+        preview.setOnClickListener(v->refresh());
+        TextView note=label("*Android y el ahorro de batería de HONOR pueden retrasar la lectura con pantalla apagada. " +
+            "El acceso a notificaciones es necesario para detectar los avisos de Amazon Alexa. " +
+            "La prueba de pantalla apagada se reproduce una vez después de unos 20 segundos; " +
+            "no añade recordatorios. Esta app no utiliza micrófono, Spotify ni conexión a internet.",13,0xFFE9DDC9);
+        note.setPadding(0,dp(18),0,0);root.addView(note);
+        if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},501);
+        refresh();
     }
-
-    @Override protected void onResume() { super.onResume(); updatePending(); }
-
-    private void updatePending() {
-        if (pendingView == null || stateView == null) return;
-        String pending = getSharedPreferences(AlexaNotificationListener.PREFS, MODE_PRIVATE)
-                .getString(AlexaNotificationListener.KEY_TEXT, "");
-        pendingView.setText(pending.isEmpty() ? "Sin recordatorios pendientes" : pending);
-        stateView.setText(pending.isEmpty() ? "Esperando recordatorios de Amazon Alexa" :
-                "Pendiente de confirmación");
+    private void scheduleScreenOffTest() {
+        AlarmManager manager=(AlarmManager)getSystemService(Context.ALARM_SERVICE);
+        if(manager==null){Toast.makeText(this,"No se pudo programar la prueba",Toast.LENGTH_LONG).show();return;}
+        Intent intent=new Intent(this,ScreenOffTestReceiver.class).setAction(ScreenOffTestReceiver.ACTION_TEST);
+        PendingIntent pending=PendingIntent.getBroadcast(this,72,intent,
+            PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        manager.cancel(pending);
+        long when=SystemClock.elapsedRealtime()+20000L;
+        if(Build.VERSION.SDK_INT>=23)
+            manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,when,pending);
+        else manager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,when,pending);
+        Toast.makeText(this,"Prueba programada. Apaga la pantalla ahora. Sonará en unos 20 segundos (Android puede retrasarla).",Toast.LENGTH_LONG).show();
     }
-
-    private void selectSpanishVoice() {
-        if (tts == null) return;
-        try {
-            for (Voice v : tts.getVoices()) {
-                String name = v.getName().toLowerCase(Locale.ROOT);
-                if ("es".equals(v.getLocale().getLanguage()) &&
-                    (name.contains("female") || name.contains("woman") || name.contains("femen"))) {
-                    tts.setVoice(v); break;
-                }
-            }
-        } catch (Exception ignored) { }
-    }
-
-    private int dp(int n) { return (int)(n * getResources().getDisplayMetrics().density + .5f); }
-    private TextView text(String content, int sp, int color, boolean bold) {
-        TextView t = new TextView(this);
-        t.setText(content);
-        t.setTextColor(color);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
-        if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        t.setPadding(0, dp(6), 0, dp(6));
-        return t;
-    }
-    private GradientDrawable panel(int color, int radius) {
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(color); d.setCornerRadius(dp(radius)); return d;
-    }
-    private Button button(String title, int background, int color) {
-        Button b = new Button(this);
-        b.setText(title); b.setTextColor(color); b.setAllCaps(false);
-        b.setTextSize(15); b.setBackground(panel(background, 16));
-        b.setMinHeight(dp(54)); return b;
-    }
-    private LinearLayout.LayoutParams fullWidth() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, dp(8), 0, dp(8)); return params;
-    }
-    @Override protected void onDestroy() {
-        if (tts != null) { tts.stop(); tts.shutdown(); }
-        super.onDestroy();
+    @Override protected void onResume(){super.onResume();refresh();}
+    private void refresh(){
+        int n=ReminderEngine.count(this);
+        if(currentView!=null)currentView.setText(n==0?"Sin recordatorios pendientes":ReminderEngine.current(this));
+        if(countView!=null)countView.setText(n==0?"TODO AL DÍA":n+" PENDIENTE(S) — PRIMERO EN LA COLA");
     }
 }
