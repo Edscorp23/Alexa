@@ -16,7 +16,6 @@ import android.os.Looper;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import java.util.Locale;
 
@@ -25,8 +24,6 @@ public class AlexaNotificationListener extends NotificationListenerService {
     static final String KEY_TEXT = "pending_text";
     static final String KEY_NOTIFICATION = "source_key";
     static final String ACTION_CONFIRM = "com.alexavoice.app.CONFIRM_REMINDER";
-    static final String ACTION_SPOKEN = "com.alexavoice.app.REMINDER_SPOKEN";
-    static final String EXTRA_START_VOICE = "start_voice_confirmation";
     static final String CHANNEL_ID = "alexa_pending_reminder";
     private static final String ALEXA_PACKAGE = "com.amazon.dee.app";
     private static final long REPEAT_DELAY_MS = 120000L;
@@ -71,17 +68,6 @@ public class AlexaNotificationListener extends NotificationListenerService {
                 int result = tts.setLanguage(new Locale("es", "ES"));
                 ready = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED;
                 chooseFemaleSpanishVoice();
-                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                    @Override public void onStart(String utteranceId) { }
-                    @Override public void onError(String utteranceId) { }
-                    @Override public void onDone(String utteranceId) {
-                        if (utteranceId.startsWith("repeat_")) {
-                            Intent finished = new Intent(ACTION_SPOKEN);
-                            finished.setPackage(getPackageName());
-                            sendBroadcast(finished);
-                        }
-                    }
-                });
             }
             if (!pendingText.isEmpty()) {
                 showConfirmNotification();
@@ -139,10 +125,6 @@ public class AlexaNotificationListener extends NotificationListenerService {
         action.setAction(ACTION_CONFIRM);
         PendingIntent confirm = PendingIntent.getBroadcast(this, 11, action, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         PendingIntent open = PendingIntent.getActivity(this, 12, new Intent(this, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Intent voiceIntent = new Intent(this, MainActivity.class);
-        voiceIntent.putExtra(EXTRA_START_VOICE, true);
-        voiceIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent voice = PendingIntent.getActivity(this, 13, voiceIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentTitle("Alexa Voice: recordatorio pendiente")
@@ -151,7 +133,6 @@ public class AlexaNotificationListener extends NotificationListenerService {
                 .setContentIntent(open)
                 .setOngoing(true)
                 .addAction(new Notification.Action.Builder(null, "Ya lo hice", confirm).build())
-                .addAction(new Notification.Action.Builder(null, "Responder por voz", voice).build())
                 .build();
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(REMINDER_NOTIFICATION_ID, notification);
     }

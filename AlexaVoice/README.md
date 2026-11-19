@@ -1,21 +1,20 @@
-# Alexa Voice 1.5 — sin Spotify
+# Alexa Voice 1.6 — solo recordatorios, sin micrófono
 
-Aplicacion Android para HONOR X8a. Basada en la version 1.3 con el fondo anime original y el icono personalizado.
+Aplicación Android para HONOR X8a. Interfaz con la imagen anime aportada por el usuario.
 
 ## Funciones
-- Leer notificaciones de recordatorios de Amazon Alexa con voz sintetizada en espanol.
-- Repetir el recordatorio aproximadamente cada 2 minutos hasta su confirmacion mientras Android mantenga el servicio operativo.
-- Confirmar desde el boton de la aplicacion o de la notificacion.
-- Responder por voz cuando la aplicacion esta abierta y se concede el permiso de microfono.
-- Sin Spotify, sin escucha musical permanente, sin servicio foreground de microfono.
+- Lee en español los recordatorios recibidos por las notificaciones de Amazon Alexa.
+- Los repite cada 2 minutos mientras el servicio de acceso a notificaciones sigue funcionando.
+- Permite confirmar desde el botón «Ya lo hice» en la aplicación o en la notificación.
+- Sin Spotify, reconocimiento de voz ni acceso al micrófono.
 
-## Permisos
-- POST_NOTIFICATIONS: avisos y confirmacion desde la notificacion en Android 13+.
-- RECORD_AUDIO: reconocimiento de «Ya lo hice» con la app abierta; se solicita al utilizarlo.
-- BIND_NOTIFICATION_LISTENER_SERVICE: permiso especial que el usuario debe otorgar expresamente para detectar notificaciones de Amazon Alexa. Este permiso puede causar un bloqueo de Google Play Protect en APK externos. No se debe desactivar Play Protect para instalarla.
+## Privacidad y limitaciones
+- Declara únicamente `POST_NOTIFICATIONS` como permiso runtime y `BIND_NOTIFICATION_LISTENER_SERVICE` como protección del servicio de escucha.
+- Android requiere conceder manualmente acceso especial a notificaciones. Ese acceso puede abarcar notificaciones de otras aplicaciones, aunque este código solo procesa las del paquete `com.amazon.dee.app`.
+- No envía recordatorios a servidores externos y no declara `INTERNET`.
+- Guarda localmente el último recordatorio pendiente. No admite múltiples pendientes simultáneos.
+- El servicio puede interrumpirse por las restricciones de batería de MagicOS; no se garantizan repeticiones exactas con la pantalla apagada.
+- No se ha compilado ni probado en el dispositivo. Play Protect puede seguir bloqueando el APK por el acceso especial a notificaciones.
 
-## Compilar
-Mantener el workflow existente del repositorio en .github/workflows/build-apk.yml. Subir los archivos de esta carpeta AlexaVoice/ a la misma carpeta AlexaVoice/ del repositorio. GitHub Actions compilara un APK de prueba. Este codigo no se ha compilado ni examinado en un HONOR X8a desde esta entrega.
-
-## Seguridad
-No se proporciona garantia de aprobacion por Google Play Protect. No instalar APK si Play Protect lo bloquea. El codigo necesita una auditoria completa antes de una distribucion amplia. Para futuras actualizaciones conviene firmar con una clave de produccion estable.
+## Compilación
+Conservar el archivo GitHub Actions `.github/workflows/build-apk.yml` de la raíz del repositorio. Ejecutar `gradle -p AlexaVoice --no-daemon assembleDebug` con Android SDK 35 y JDK 17.
