@@ -13,6 +13,3 @@ Este proyecto incluye un flujo de GitHub Actions para generar un APK de prueba e
 El APK `debug` queda firmado automáticamente para pruebas. No es una versión de publicación en Google Play. No compartas contraseñas ni claves privadas. El repositorio puede mantenerse privado.
 
 Nota: la compilación en la nube solo genera el APK; todavía hay que instalarlo y probar en el teléfono que Alexa realmente publique los recordatorios como notificaciones.
-
-
-**Versión 1.4**: véase INSTRUCCIONES-VERSION-1-4.md.
