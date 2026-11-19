@@ -1,0 +1,13 @@
+Alexa Voice 1.5 - correccion de Gradle
+
+Para este parche, reemplaza exactamente estos archivos en tu repositorio:
+AlexaVoice/build.gradle
+AlexaVoice/settings.gradle
+AlexaVoice/app/build.gradle
+
+NO pongas ningun bloque android en AlexaVoice/build.gradle.
+NO subas los archivos .java ni AndroidManifest.xml directamente en AlexaVoice.
+La carpeta app/src/main debe contener el Manifest y app/src/main/java/com/alexavoice/app/ los .java.
+
+GitHub Actions compila desde la rama main con el workflow ya existente.
+La compilacion aun no ha sido probada aqui, y Play Protect puede continuar bloqueando el APK.
